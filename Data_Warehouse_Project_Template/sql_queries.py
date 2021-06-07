@@ -19,9 +19,21 @@ time_table_drop = "DROP TABLE  IF EXISTS time"
 
 staging_events_table_create= ("""
 CREATE TABLE IF NOT EXISTS staging_events(
-                      user_id varchar
-                     ,first_name varchar
-                     ,last_name varchar
+                      artist varchar
+                      ,status varchar
+                      ,userAgent varchar
+                      ,song varchar
+                      ,sessionId int
+                      ,registration varchar
+                      ,page varchar
+                      ,method varchar
+                      ,location varchar
+                      ,length float
+                      ,auth varchar
+                      ,itemInSession int
+                      ,userId varchar
+                     ,firstName varchar
+                     ,lastName varchar
                      ,gender varchar
                      ,level varchar
                      ,ts time)
@@ -32,7 +44,7 @@ staging_songs_table_create = ("""
 CREATE TABLE IF NOT EXISTS staging_songs(
                       song_id varchar
                       ,title varchar
-                      ,artist_id varchar
+
                       ,year int
                       ,duration float
                       ,artist_id varchar
@@ -43,9 +55,10 @@ CREATE TABLE IF NOT EXISTS staging_songs(
 """)
 
 songplay_table_create = ("""
-"CREATE TABLE IF NOT EXISTS songplays (songplay_id SERIAL PRIMARY KEY
+CREATE TABLE IF NOT EXISTS songplays (songplay_id  int IDENTITY(0,1)
                          ,start_time time NOT NULL
                          ,user_id int NOT NULL
+                         ,artist_name varchar
                          ,level varchar
                          ,song_id varchar
                          ,artist_id varchar
@@ -102,10 +115,7 @@ staging_events_copy = ("""copy staging_events from '{}'
 
 
 staging_songs_copy =("""copy staging_songs from '{}'
- credentials 'aws_iam_role={}'
- region 'us-west-2'
- COMPUPDATE OFF STATUPDATE OFF
- JSON '{}'""").format(config.get('S3','LOG_DATA'),
+ JSON '{}'""").format(config.get('S3','SONG_DATA'),
 
                         config.get('IAM_ROLE', 'ARN'),
 
@@ -114,35 +124,52 @@ staging_songs_copy =("""copy staging_songs from '{}'
 
 # FINAL TABLES
 
-songplay_table_insert = ("""INSERT INTO songplays (start_time ,
-                                                   user_id,level,
-                                                   song_id,artist_id,
-                                                   session_id ,
-                                                   user_agent ,
-                                                   location )
-                         VALUES (%s, %s, %s,%s,%s,%s,%s,%s);
-
-""")
+songplay_table_insert = ("""INSERT INTO songplay(start_time ,
+                                  user_id,level,
+                                  song_id,artist_id,
+                                  session_id ,
+                                  user_agent ,
+                                location )
+                            select  extract (time,se.ts),
+                            se.userId,se.level,
+                            ss.song_id,ss.artist_id,
+                            se.sessionId,se.userAgent,
+                            se.location
+                            from staging_events se
+                            join staging_songs ss
+                            on se.artist=ss.artist_name
+                            and
+                            se.song=ss.title
+                            and
+                            se.length=ss.duration
+                            where WHERE se.page='NextSong'
+                            """)
 
 user_table_insert = ("""INSERT INTO users(user_id, first_name,last_name ,gender ,level )
-                     VALUES (%s, %s, %s,%s,%s)
+                     select userId, firstName,lastName,gender,level
+                     from staging_events
                      ON CONFLICT (user_id) DO UPDATE SET level=EXCLUDED.level;
 
 """)
 
 song_table_insert = ("""
 INSERT INTO songs (song_id,title,artist_id,year,duration)
-                     VALUES (%s, %s, %s,%s,%s)
+                    select   song_id,title,artist_id,year,duration
+                    from staging_songs
                      ON CONFLICT (song_id)  DO NOTHING ;
 """)
 
 artist_table_insert = ("""INSERT INTO artists(artist_id,name,location ,latitude,longitude)
-                       VALUES (%s, %s, %s,%s,%s)
+                       select artist_id,name,location,latitude,longitude
+                       from  staging_songs
                        ON CONFLICT (artist_id)  DO UPDATE SET location=EXCLUDED.location
 """)
 
 time_table_insert = ("""INSERT INTO time (start_time,hour,day,week,month,year,weekday)
-                     VALUES (%s, %s, %s,%s,%s,%s,%s) 
+                     select   extract (time,ts), extract(hour,ts),
+                     extract(day,ts),extract(week,ts)
+                     ,extract(month,ts),extract(year,ts)
+                     ,extract(weekday,ts)
                      ON CONFLICT (start_time) DO NOTHING;
 """)
 
