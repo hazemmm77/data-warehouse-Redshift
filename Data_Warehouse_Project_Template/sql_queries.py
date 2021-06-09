@@ -19,40 +19,39 @@ time_table_drop = "DROP TABLE  IF EXISTS time"
 
 staging_events_table_create= ("""
 CREATE TABLE IF NOT EXISTS staging_events(
-                      artist varchar
-                      ,status varchar
-                      ,userAgent varchar
-                      ,song varchar
-                      ,sessionId int
-                      ,registration varchar
-                      ,page varchar
-                      ,method varchar
-                      ,location varchar
-                      ,length float
-                      ,auth varchar
-                      ,itemInSession int
-                      ,userId varchar
-                     ,firstName varchar
-                     ,lastName varchar
-                     ,gender varchar
-                     ,level varchar
-                     ,ts time)
-
+                      artist varchar(max)
+                       ,auth text
+                       ,firstName text
+                       ,gender text
+                        ,itemInSession bigint
+                        ,lastName text
+                        ,length  varchar(50)
+                         ,level text
+                           ,location text
+                            ,method text
+                              ,page text
+                              ,registration varchar(50)
+                                    ,sessionId int
+                                     ,song text
+                      ,status text
+                      ,ts bigint
+                      ,userAgent text
+                      ,userId int
+                     )
 """)
 
 staging_songs_table_create = ("""
 CREATE TABLE IF NOT EXISTS staging_songs(
-                      song_id varchar
-                      ,title varchar
-
-                      ,year int
-                      ,duration float
-                      ,artist_id varchar
-                       ,name varchar
-                       ,location varchar
-                       ,latitude varchar
-                       ,longitude varchar)
-""")
+                      num_songs int,
+                    artist_name varchar(max),
+                     artist_latitude numeric,
+                     artist_longitude numeric,
+                    artist_location varchar(max),
+                  song_id text,
+                    title text,
+                   duration numeric,
+                    year int)
+           """)
 
 songplay_table_create = ("""
 CREATE TABLE IF NOT EXISTS songplays (songplay_id  int IDENTITY(0,1)
@@ -113,13 +112,19 @@ staging_events_copy = ("""copy staging_events from '{}'
 
                         config.get('S3','LOG_JSONPATH'))
 
+staging_songs_copy=("""copy staging_songs from '{}'
+                         credentials 'aws_iam_role={}'
+                         region 'us-west-2'
+                         COMPUPDATE OFF STATUPDATE OFF
+                         JSON 'auto'""").format(config.get('S3','SONG_DATA'),
 
-staging_songs_copy =("""copy staging_songs from '{}'
- JSON '{}'""").format(config.get('S3','SONG_DATA'),
+                                                config.get('IAM_ROLE', 'ARN'))
 
-                        config.get('IAM_ROLE', 'ARN'),
 
-                        config.get('S3','LOG_JSONPATH'))
+
+
+
+
 
 
 # FINAL TABLES
@@ -130,7 +135,7 @@ songplay_table_insert = ("""INSERT INTO songplay(start_time ,
                                   session_id ,
                                   user_agent ,
                                 location )
-                            select  extract (time,se.ts),
+                            select  se.ts,
                             se.userId,se.level,
                             ss.song_id,ss.artist_id,
                             se.sessionId,se.userAgent,
@@ -160,16 +165,17 @@ INSERT INTO songs (song_id,title,artist_id,year,duration)
 """)
 
 artist_table_insert = ("""INSERT INTO artists(artist_id,name,location ,latitude,longitude)
-                       select artist_id,name,location,latitude,longitude
+                       select artist_id,artist_name,artist_location,
+                       artist_latitude,artist_longitude
                        from  staging_songs
                        ON CONFLICT (artist_id)  DO UPDATE SET location=EXCLUDED.location
 """)
 
 time_table_insert = ("""INSERT INTO time (start_time,hour,day,week,month,year,weekday)
-                     select   extract (time,ts), extract(hour,ts),
+                     select   ts, extract(hour,ts),
                      extract(day,ts),extract(week,ts)
                      ,extract(month,ts),extract(year,ts)
-                     ,extract(weekday,ts)
+                     ,extract(weekday,ts) from stg_events
                      ON CONFLICT (start_time) DO NOTHING;
 """)
 
@@ -177,5 +183,5 @@ time_table_insert = ("""INSERT INTO time (start_time,hour,day,week,month,year,we
 
 create_table_queries = [staging_events_table_create, staging_songs_table_create, songplay_table_create, user_table_create, song_table_create, artist_table_create, time_table_create]
 drop_table_queries = [staging_events_table_drop, staging_songs_table_drop, songplay_table_drop, user_table_drop, song_table_drop, artist_table_drop, time_table_drop]
-copy_table_queries = [staging_events_copy, staging_songs_copy]
+copy_table_queries = [ staging_events_copy,staging_songs_copy]
 insert_table_queries = [songplay_table_insert, user_table_insert, song_table_insert, artist_table_insert, time_table_insert]
