@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS staging_events(
                                     ,sessionId int
                                      ,song text
                       ,status text
-                      ,ts TIMESTAMP
+                      ,ts  bigint
                       ,userAgent text
                       ,userId int
                      )
@@ -139,7 +139,7 @@ songplay_table_insert = ("""INSERT INTO songplays(start_time ,
                                   session_id ,
                                   user_agent ,
                                 location )
-                            SELECT DISTINCT TIMESTAMP 'epoch' + (se.ts / 1000) * INTERVAL '1 second' as start_time,
+                             SELECT DISTINCT timestamp 'epoch' + se.ts * interval '0.001 seconds' as  start_time,
                             se.userId,se.level,
                             ss.song_id,ss.artist_id,
                             se.sessionId,se.userAgent,
