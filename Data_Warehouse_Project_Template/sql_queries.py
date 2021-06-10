@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS artists(artist_id varchar PRIMARY KEY
 """)
 
 time_table_create = ("""
-CREATE TABLE IF NOT EXISTS time (start_time TIMESTAMP PRIMARY KEY
+CREATE TABLE IF NOT EXISTS time (start_time TIMESTAMP  PRIMARY KEY
                      ,hour varchar
                      ,day int
                      ,week int
@@ -176,10 +176,11 @@ artist_table_insert = ("""INSERT INTO artists(artist_id,name,location ,latitude,
 """)
 
 time_table_insert = ("""INSERT INTO time (start_time,hour,day,week,month,year,weekday)
-                     select   ts, extract(hour from ts),
-                     extract(day from ts),extract(week from ts)
-                     ,extract(month from ts),extract(year from ts)
-                     ,extract(weekday from ts) from staging_events
+                    SELECT    DISTINCT TIMESTAMP 'epoch' + ts/1000 * INTERVAL '1 second' AS start_time,
+                    extract(hour from start_time),
+                     extract(day from start_time),extract(week from  start_time)
+                     ,extract(month from  start_time),extract(year from start_time)
+                     ,extract(weekday from start_time) from staging_events
 
 """)
 
